@@ -22,10 +22,10 @@ def register(request):
         # Password is stored in plaintext. Anyone with DB access (an insider,
         # a leaked backup, an SQL-injection read via FLAW 2) gets every
         # user's real password directly, not just a hash.
-        AppUser.objects.create(username=username, password=password)
+        AppUser.objects.create(username=username, password=make_password(password))
 
         # ------------------------------------------------------------------
-        # FIX (commented out): hash the password before storing it, using
+        # FIX  hash the password before storing it, using
         # Django's PBKDF2-based hasher (salted + slow by design).
         # AppUser.objects.create(username=username, password=make_password(password))
 
@@ -50,11 +50,11 @@ def login_view(request):
             return response
 
         # ------------------------------------------------------------------
-        # FIX (commented out):
-        # if check_password(password, user.password):
-        #     response = redirect("note_list")
-        #     response.set_cookie("uid", user.id)
-        #     return response
+        # FIX
+        if check_password(password, user.password):
+             response = redirect("note_list")
+             response.set_cookie("uid", user.id)
+             return response
 
         return HttpResponse("Invalid credentials", status=401)
     return render(request, "notes/login.html")

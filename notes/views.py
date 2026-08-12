@@ -27,7 +27,7 @@ def register(request):
         # ------------------------------------------------------------------
         # FIX  hash the password before storing it, using
         # Django's PBKDF2-based hasher (salted + slow by design).
-        # AppUser.objects.create(username=username, password=make_password(password))
+        # 
 
         return redirect("login")
     return render(request, "notes/register.html")
@@ -103,9 +103,9 @@ def note_detail(request, note_id):
     note = get_object_or_404(Note, id=note_id, owner=user)
 
     # -------------------------------------------------------------------
-    # FIX (commented out): scope the lookup to the current user so a
+    # FIX: scope the lookup to the current user so a
     # request for someone else's note ID returns 404 instead of the data.
-    # note = get_object_or_404(Note, id=note_id, owner=user)
+    
 
     return render(request, "notes/detail.html", {"note": note})
 
@@ -130,7 +130,7 @@ def note_search(request):
         rows = cursor.fetchall()
 
     # -------------------------------------------------------------------
-    # FIX (commented out): use parameterized queries (or better, the ORM)
+    # FIX: use parameterized queries (or better, the ORM)
     # so user input is never concatenated into the SQL string.
     notes = Note.objects.filter(owner=user, title__icontains=query)
     rows = [(n.id, n.title, n.body, n.owner_id) for n in notes]
@@ -138,7 +138,7 @@ def note_search(request):
     return render(request, "notes/search.html", {"rows": rows, "query": query})
 
 
-@csrf_exempt
+
 def note_delete(request, note_id):
     # -------------------------------------------------------------------
     # FLAW 5 (CSRF)
@@ -154,15 +154,7 @@ def note_delete(request, note_id):
     return HttpResponse(status=405)
 
     # -------------------------------------------------------------------
-    # FIX (commented out): remove @csrf_exempt entirely (Django's CSRF
+    # FIX remove @csrf_exempt entirely (Django's CSRF
     # middleware protects POST views by default as long as the template
     # includes {% csrf_token %} in the delete form and the decorator above
-    # is deleted):
-    #
-    # def note_delete(request, note_id):
-    #     if request.method == "POST":
-    #         user = _current_user(request)
-    #         note = get_object_or_404(Note, id=note_id, owner=user)
-    #         note.delete()
-    #         return redirect("note_list")
-    #     return HttpResponse(status=405)
+   

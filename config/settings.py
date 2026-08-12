@@ -36,13 +36,12 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 # -----------------------------------------------------------------------
-# FIX (commented out): load secrets from the environment, default DEBUG
+# FIX : load secrets from the environment, default DEBUG
 # to False, and require an explicit host allowlist.
-#
-# import os
-# SECRET_KEY = os.environ["DJANGO_SECRET_KEY"]
-# DEBUG = os.environ.get("DJANGO_DEBUG", "False") == "True"
-# ALLOWED_HOSTS = os.environ.get("DJANGO_ALLOWED_HOSTS", "").split(",")
+
+
+#DEBUG = False
+#ALLOWED_HOSTS = ["127.0.0.1", "localhost"]
 
 
 # Application definition

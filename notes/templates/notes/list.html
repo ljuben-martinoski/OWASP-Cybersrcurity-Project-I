@@ -1,0 +1,12 @@
+<h1>Your notes</h1>
+<ul>
+{% for note in notes %}
+  <li><a href="{% url 'note_detail' note.id %}">{{ note.title }}</a>
+    <form method="post" action="{% url 'note_delete' note.id %}" style="display:inline">
+      {% csrf_token %}
+      <button type="submit">Delete</button>
+    </form>
+  </li>
+{% endfor %}
+</ul>
+<p><a href="{% url 'note_create' %}">+ New Note</a> | <a href="{% url 'note_search' %}">Search</a></p>

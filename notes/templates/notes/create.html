@@ -1,0 +1,7 @@
+<h1>New Note</h1>
+<form method="post">{% csrf_token %}
+  <input name="title" placeholder="Title"><br><br>
+  <textarea name="body" placeholder="Write your note here..." rows="5" cols="40"></textarea><br><br>
+  <button type="submit">Save</button>
+</form>
+<p><a href="{% url 'note_list' %}">Back to notes</a></p>

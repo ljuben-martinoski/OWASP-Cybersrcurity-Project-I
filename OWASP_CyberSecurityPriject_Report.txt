@@ -1,0 +1,48 @@
+Introduction
+
+This report documents five security vulnerabilities identified in a Django-based notes application, each mapped to a corresponding entry in the OWASP Top 10 (2021).The application was deliberatly constructed with there weaknesses present so that each flaw, ist real-world impact, and its remedition could be studied in isolation.The findings are present in order of the OWASP rankin they represent.
+
+Flaw 1--A01:2021 Broken Access Control (IDOR)
+
+Location: note_detail() in views.py
+
+Broken Access Control is the most prevalent web application vulnerability category in the 2021 OWASP list, and this application demonstrates one of its most common forms: an Insecure Direct Object Reference (IDOR). The mote_detail view retrives note from the database using only the ID supplied in the URL — there is no check to confirm that the note actually belongs to the user making the request. Any authenticated user can therefore enumerate note IDs and read content that was never intended for them. If Alice creates a note and it is assigned ID 1, Bob only needs to navigate to /notes/1/ to read it in full.
+
+The fix is a single-line changer. Rather than fetching the note with get_object_or_404(Note, pk=id), the query should be scoped to the requesting user: get_object_or_404(Note, pk=id, owner=request.user). With this in place, any attempt to access a note belonging to another user returns a 404 response, leaking neither the note's content nor even confirmation that it exists.
+
+Flaw 2--A03:2021 Injection(SQL Injection)
+
+Location note_search() in views.py
+The search functionality constructs a raw SQL query by interpolating the user-supplied search term directly into a Python format string. There is no sanitisation, escaping, or parameterisation — the database receives exactly what the user typed as part of the SQL statement itself. This makes it trivial for an attacker to break out of the intended query context and issue arbitrary SQL commands. A search string such as 'UNION SELECT id, username, password, id FROM notes_appuser -- auses the database to append the entire user table to the result set, returning every username and stored password in a single response.
+
+The correct approach is to let Django's ORM handle query construction entirely:
+Note.objects.filter(title__icontains=query)'. The ORM passes the search term as a bound parameter rather embedding in the SQL text,so no matter what the user submits, it is treated as data and never executed as a command. If raw SQL is genuinely necessary for a specific use case, Django's cursor.execute() supports parameterised queries that provide the same protection.
+
+Flaw 3 -- A02:2021 Criprographic Failures
+ocation: register() and login_view() in views.py
+
+Passwords in this application are stored in the database exactly as the user typed them — plain, unmodified text. During login, the submitted password is compared to the stored value with a simple == equality check. This means a single point of access to the database( through the SQL injection flaw above , a backup file, or a misconfigured admin panel) exposes every user's real password immediately. Since people routinely reuse passwords across services, a breach here extends well beyond this application.
+
+The fix uses two funktions built into Django's authentication system. On registration, make_password(raw_password) runs the password through Django's default PBKDF2-SHA256 hasher, adding a random salt and performing many rounds of stretching before storing the result. On login, check_password(raw_password, stored_hash) replicates this process and compares the outcomes, so the real password never needs to be stored at all. Even with full database access, an attacker obtains only hashes that are computationally expensive to reverse.
+
+Flaw 4 -- A05:2021 Security Misconfiguration
+Location: config/settings.py
+
+Three related misconfigurations are present in the settings file, each capable of causing harm on its own. First, DEBUG = True is left active. In debug mode, any unhandled exception causes Django to render a detailed error page in the browser — one that includes the full stack trace, local variable values, and a dump of the application's settings, including the secret key itself. Second, the SECRET_KEY is hardcoded directly in the settings file, meaning anyone who can read the source code(a public repository, a leaked backup) can use it to forge session tokens and signed data. Third, ALLOWED_HOSTS is empty, which combined with debug mode allows the application to respond to any hostname.
+Remediation requires three coordinated changes. SECRET_KEY should be loaded from an environment variable (os.environ['SECRET_KEY']) so it never appears in version control. DEBUG should default to False and only be enabled explicitly in a local development environment, also via an environment variable. ALLOWED_HOSTS should list only the domains the application legitimatly serves. Togheter there changes eliminate the information leakage that debug mode creates and protect the cryptographic foundations the framework relies on.
+
+Flaw 5 -- Cross-Site Request Forgery(CSRF)
+Location: note_delete() in views.py
+
+Django ships with CSRF protection enabled globally through its middleware. For every state-changing request, the middleware requires the browser to include a secret token that was embedded in the page when it was originally rendered — a token that a third-party site cannot read due to the browser's same-origin policy. The note_delete() view undermines this entirely by beeing decorated with @csrf_exampt , which tells the middleware to skip the check for that endpoint.
+With CSRF protection disabled, a malicious website can embed a hidden HTML form pointing to /notes/2/delete/ and submit it automatically when a victim visits the page. The victim's browser attaches their session cookie to the request as normal, so from the application's perspective the deletion looks legitimate. The note is deleted without the user's knowledge or consent. The fix is simply to remove the @csrf_exempt decorator.
+Django's middleware then enforces the token requirement, and since an external page has no way to read or predict the token, cross-origin form submissions are blocked.
+
+1. A01 Broken Access Control: root cause(No ownership check on note_detail()). Primary Risk is the users read each other's private notes.
+2. A03 Injection:  Raw SQL built from user input. root cause is primary risk is full database dump via crafted search.
+3. 	A02 Cryptographic Failures: root cause is plain text password storage and comparison. Primary risk is all user passwords exposed in any breach.
+4. A05 Security Misconfiguration: root cause is debug mode, hardcoded secret, empty hosts. Primary risk is stack traces, secret key, and settings leaked.
+5. CSRF: root cause is @csrf_exempt on delete endpoint. Primary risk is victim's notes deleted by a malicious page.
+
+
+Each of these flaws is individually serious; in combination they compound one another significantly — the SQL injection, for instance, extracts the plaintext passwords that the cryptographic failure leaves unprotected. Addressing all five requires only small, targeted changes to existing code, none of which demand a structural rewrite.
